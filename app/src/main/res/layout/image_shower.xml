@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <!-- 이미지를 보여줄 ImageView, 동그랗게 클리핑 -->
+    <ImageView
+        android:id="@+id/imageView"
+        android:layout_width="110dp"
+        android:layout_height="110dp"
+        android:layout_centerHorizontal="true"
+        android:layout_marginTop="20dp"
+        android:padding="10dp"
+        android:scaleType="centerCrop"
+        android:background="@drawable/round_image_background" />
+
+    <!-- 왼쪽 이미지 버튼 -->
+    <ImageButton
+        android:id="@+id/buttonLeft"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:layout_marginEnd="14dp"
+        android:layout_toLeftOf="@id/imageView"
+        android:layout_centerVertical="true"
+        android:background="@drawable/left_arrow_image" />
+
+    <!-- 오른쪽 이미지 버튼 -->
+    <ImageButton
+        android:id="@+id/buttonRight"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:layout_marginStart="14dp"
+        android:layout_toRightOf="@id/imageView"
+        android:layout_centerVertical="true"
+        android:background="@drawable/right_arrow_image" />
+
+    <!-- Send 버튼 추가 -->
+    <Button
+        android:id="@+id/buttonSend"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/imageView"
+        android:layout_centerHorizontal="true"
+        android:layout_marginTop="20dp"
+        android:text="Send"
+        /> <!-- 디자인을 위한 배경 설정 -->
+</RelativeLayout>

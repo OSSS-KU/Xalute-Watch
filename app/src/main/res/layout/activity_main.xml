@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <androidx.wear.widget.BoxInsetLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        tools:context="com.example.xalute.xalute_galaxy.MainActivity"
+        tools:deviceIds="wear"
+        android:background="@color/white">
+
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:padding="@dimen/inner_frame_layout_padding"
+            app:boxedEdges="all"
+            tools:ignore="MissingPrefix">
+
+            <TextView
+                android:id="@+id/textView"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="10px"
+
+                android:text="@string/xalute_ecg_monitor"
+                android:textAlignment="center"
+                android:textAppearance="@style/TextAppearance.AppCompat.Small"
+                android:textColor="@color/k_red"
+                android:textSize="14sp"
+                tools:textStyle="bold"/>
+
+            <ListView
+                android:id="@+id/sensors_list_view"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                />
+        </FrameLayout>
+    </androidx.wear.widget.BoxInsetLayout>
+</layout>

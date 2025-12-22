@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.example.xalute">
+
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.BODY_SENSORS" />
+    <uses-permission android:name="android.permission.BODY_SENSORS_BACKGROUND" />
+    <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="com.samsung.android.health.permission.TRACK_ECG_ON_DEMAND" />
+
+    <uses-permission android:name="com.google.android.wearable.permission.RECEIVE_MESSAGES" />
+    <uses-feature android:name="android.hardware.type.watch" />
+
+    <application
+        android:allowBackup="true"
+        android:label="@string/app_name"
+        android:usesCleartextTraffic="true"
+        android:supportsRtl="true"
+        android:theme="@android:style/Theme.DeviceDefault"
+        android:icon="@mipmap/ic_launcher_adaptive_fore"
+        android:roundIcon="@mipmap/ic_launcher_adaptive_fore">
+
+        <activity
+            android:name="com.example.xalute.EcgInfoActivity"
+            android:exported="true"
+            android:label="@string/app_name">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <activity
+            android:name="com.example.xalute.HeartRateActivity"
+            android:exported="false" />
+        <activity
+            android:name="com.example.xalute.SettingActivity"
+            android:exported="false" />
+        <activity
+            android:name="com.example.xalute.EcgActivity"
+            android:exported="true" />
+        <activity
+            android:name="com.example.xalute.ImageSender"
+            android:exported="false" />
+        <activity
+            android:name="com.example.xalute.PermissionActivity"
+            android:exported="false"
+            android:launchMode="singleTop" />
+        <activity
+            android:name="com.example.xalute.DataSendingActivity"
+            android:exported="false"
+            />
+        <!--<activity
+            android:name="org.xalute_galaxy.MainActivity"
+            android:exported="true"
+            android:label="@string/app_name">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+-->
+        <service
+            android:name="com.example.xalute.MessageService"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.google.android.gms.wearable.BIND_LISTENER" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="com.google.android.gms.wearable.MESSAGE_RECEIVED" />
+                <data android:scheme="wear" android:host="*" android:pathPrefix="/start-app" />
+            </intent-filter>
+        </service>
+
+        <meta-data
+            android:name="com.google.android.wearable.standalone"
+            android:value="true" />
+    </application>
+</manifest>

@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.wear.widget.BoxInsetLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    tools:context="com.example.xalute.xalute_galaxy.EcgInfoActivity"
+    android:background="@color/white">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        app:boxedEdges="all"
+        tools:layout_editor_absoluteX="0dp">
+
+        <ImageView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:src="@drawable/ecg_heart" />
+
+        <TextView
+            android:id="@+id/ecg_info"
+            android:layout_width="match_parent"
+            android:layout_height="50dp"
+            android:gravity="center"
+            android:text="@string/Ecg_info_default"
+            android:textSize="13sp"
+            android:textAlignment="center"
+            android:textColor="@color/black"/>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="38dp"
+            android:text="30초동안 홈 버튼에 손가락을 가볍게 올려 놓으세요"
+            android:textSize="13sp"
+            android:textAlignment="center"
+            android:textColor="@color/black" />
+
+
+        <Button
+            android:id="@+id/button"
+            android:layout_width="60dp"
+            android:layout_height="50dp"
+            android:layout_gravity="center_horizontal"
+            android:text="확인"
+            android:textColor="@color/black"
+            android:backgroundTint="@color/k_red"/>
+
+
+    </LinearLayout>
+</androidx.wear.widget.BoxInsetLayout>

@@ -1,0 +1,17 @@
+<resources>
+    <string name="app_name">Xalute</string>
+    <!--
+    This string is used for square devices and overridden by hello_world in
+    values-round/strings.xml for round devices.
+    -->
+    <string name="xalute_ecg_monitor">Xalute ECG Monitor</string>
+    <string name="Ecg_info_default">워치가 내 왼쪽 손목에 꼭 맞게 적용되었는지 확인하세요.</string>
+
+    <string name="live_data_header">Live Data</string>
+    <string name="ecg1">Avg. ECG</string>
+    <string name="ecg_lead_off">Lead Off</string>
+    <string name="ecg_sequence">Sequence</string>
+    <string name="ecg_green">PPG Green</string>
+    <string name="ecg_threshold_max">Max Threshold</string>
+    <string name="ecg_threshold_min">Min Threshold</string>
+</resources>
