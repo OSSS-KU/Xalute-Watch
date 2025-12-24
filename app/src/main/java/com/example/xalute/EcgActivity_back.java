@@ -261,7 +261,11 @@ public class EcgActivity_back extends FragmentActivity {
             ).show();
 
             try {
+<<<<<<< HEAD
                 ecgTracker = healthTrackingService.getHealthTracker(HealthTrackerType.ECG);
+=======
+                ecgTracker = healthTrackingService.getHealthTracker(HealthTrackerType.ECG_ON_DEMAND);
+>>>>>>> 7b28331cc21bdfa3b70cd5c8e55db3804a0bcf5a
             } catch (final IllegalArgumentException e) {
                 runOnUiThread(() -> Toast.makeText(getApplicationContext(), e.getMessage(), Toast.LENGTH_LONG).show()
                 );
@@ -308,7 +312,12 @@ public class EcgActivity_back extends FragmentActivity {
 
             for (DataPoint dataPoint : list) {
                 long timestamp = dataPoint.getTimestamp();
+<<<<<<< HEAD
                 int ecgVal = dataPoint.getValue(ValueKey.EcgSet.ECG);
+=======
+                Float ecgObj = dataPoint.getValue(ValueKey.EcgSet.ECG_MV);
+                int ecgVal = (int)(ecgObj.floatValue());
+>>>>>>> 7b28331cc21bdfa3b70cd5c8e55db3804a0bcf5a
                 int leadOff = dataPoint.getValue(ValueKey.EcgSet.LEAD_OFF);
 
                 latestEcg = ecgVal;
