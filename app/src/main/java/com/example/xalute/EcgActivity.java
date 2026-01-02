@@ -134,42 +134,79 @@ public class EcgActivity extends FragmentActivity {
                     return;
                 }
 
-                String server1Url = "http://35.238.174.154:3000/mutation/addData";
-                String currentTime = getCurrentTime();
+                final String server1Url = "http://35.238.174.154:3000/mutation/addEcgData";
 
-                // 6초 제거 알고리즘 삭제
-                String fhirData = EcgDataConverter.convertEcgDataListToJsonString(getApplicationContext(), ecgDataList, currentTime);
+                final String currentTime = getCurrentTime();
 
-                Log.d(TAG, "[Send] 저장할 JSON: " + fhirData);
+                final String requestBody = EcgDataConverter.convertEcgDataListToServerBodyJson(
+                        getApplicationContext(),
+                        ecgDataList,
+                        currentTime,
+                        500.0
+                );
+
+                Log.d(TAG, "[Send] 서버1로 전송할 JSON: " + requestBody);
+
+                if (requestBody == null) {
+                    Toast.makeText(getApplicationContext(), "❌ 요청 바디 생성 실패", Toast.LENGTH_SHORT).show();
+                    return;
+                }
 
                 showProgressDialog();
 
                 new Handler(Looper.getMainLooper()).post(() -> {
-                    FHIRSender sender = new FHIRSender(getApplicationContext(), new FHIRSender.FHIRSenderListener() {
+
+                    final String userAgent = "android";
+
+                    EcgAddDataSender sender = new EcgAddDataSender();
+                    sender.postAddEcgData(server1Url, userAgent, requestBody, new EcgAddDataSender.Listener() {
                         @Override
-                        public void onSendCompleted(boolean success) {
+                        public void onSuccess(String responseBody) {
                             runOnUiThread(() -> {
-                                if (success) {
-                                    Log.d(TAG, "✅ 저장 성공");
-                                    File ecgFile = saveEcgDataToFile();
-                                    if (ecgFile != null) {
-                                        uploadEcgFileToServer(ecgFile);
-                                    } else {
+                                try {
+                                    Log.d(TAG, "✅ 서버1 응답 수신: " + responseBody);
+
+                                    List<EcgData> returnedList = parseEcgListFromAddEcgResponse(responseBody);
+
+                                    if (returnedList == null || returnedList.isEmpty()) {
                                         dismissProgressDialog();
-                                        Toast.makeText(getApplicationContext(), "❌ ECG 파일 저장 실패", Toast.LENGTH_SHORT).show();
+                                        Log.e(TAG, "❌ 서버 응답 data가 비어있음");
+                                        Toast.makeText(getApplicationContext(), "❌ 서버 응답 data가 비어있습니다.", Toast.LENGTH_LONG).show();
+                                        return;
                                     }
-                                } else {
+
+                                    File ecgFile = saveEcgDataToFile(returnedList);
+
+                                    if (ecgFile == null) {
+                                        dismissProgressDialog();
+                                        Log.e(TAG, "❌ ECG 파일 저장 실패");
+                                        Toast.makeText(getApplicationContext(), "❌ ECG 파일 저장 실패", Toast.LENGTH_SHORT).show();
+                                        return;
+                                    }
+
+                                    uploadEcgFileToServer(ecgFile);
+
+
+                                } catch (Exception e) {
                                     dismissProgressDialog();
-                                    Log.e(TAG, "❌ 저장 실패");
-                                    Toast.makeText(getApplicationContext(), "❌ FHIR 데이터 전송 실패", Toast.LENGTH_SHORT).show();
+                                    Log.e(TAG, "❌ 서버1 응답 처리 오류", e);
+                                    Toast.makeText(getApplicationContext(), "❌ 응답 처리 오류: " + e.getMessage(), Toast.LENGTH_LONG).show();
                                 }
                             });
                         }
-                    });
 
-                    sender.execute(fhirData, server1Url);
+                        @Override
+                        public void onFailure(String errorMsg) {
+                            runOnUiThread(() -> {
+                                dismissProgressDialog();
+                                Log.e(TAG, "❌ 서버1 전송 실패: " + errorMsg);
+                                Toast.makeText(getApplicationContext(), "❌ 서버 전송 실패: " + errorMsg, Toast.LENGTH_LONG).show();
+                            });
+                        }
+                    });
                 });
             });
+
 
         } else {
             Log.i(TAG, "onCreate Permission not granted");
@@ -561,7 +598,7 @@ public class EcgActivity extends FragmentActivity {
         });
     }
 
-    private File saveEcgDataToFile() {
+    private File saveEcgDataToFile(List<EcgData> dataToSave) {
         File dir = new File(getExternalFilesDir(null), "ecg_data");
         if (!dir.exists()) dir.mkdirs();
 
@@ -570,21 +607,16 @@ public class EcgActivity extends FragmentActivity {
         try (FileWriter writer = new FileWriter(file)) {
             StringBuilder sb = new StringBuilder();
 
-            List<EcgData> dataToSave = ecgDataList; // 6초 제거 알고리즘 삭제
-            int sampleCount = dataToSave.size();
-            double intervalSec = 1.0 / 512.0;
-
-            for (int i = 0; i < sampleCount; i++) {
-                EcgData data = dataToSave.get(i);
-                double syntheticTs = i * intervalSec;
-
+            for (int i = 0; i < dataToSave.size(); i++) {
+                EcgData d = dataToSave.get(i);
                 sb.append("(")
-                        .append(data.getEcgValue()).append(", ")
-                        .append(syntheticTs)
-                        .append(") ");
+                        .append(d.getEcgValue()).append(", ")
+                        .append(d.getTimestamp())
+                        .append(")");
+                if (i < dataToSave.size() - 1) sb.append(" ");
             }
 
-            writer.write(sb.toString().trim());
+            writer.write(sb.toString());
             writer.flush();
             Log.d(TAG, "✅ ECG data saved to " + file.getAbsolutePath());
             return file;
@@ -593,6 +625,7 @@ public class EcgActivity extends FragmentActivity {
             return null;
         }
     }
+
 
     private File saveRawEcgDataToFile() {
         File dir = new File(getExternalFilesDir(null), "ecg_raw_data_cut6");
@@ -743,4 +776,21 @@ public class EcgActivity extends FragmentActivity {
         }
         return "normal";
     }
+
+    private List<EcgData> parseEcgListFromAddEcgResponse(String responseJson) throws Exception {
+        JSONObject root = new JSONObject(responseJson);
+
+        List<EcgData> list = new ArrayList<>();
+        if (!root.has("data")) return list;
+
+        JSONArray data = root.getJSONArray("data");
+        for (int i = 0; i < data.length(); i++) {
+            JSONArray pair = data.getJSONArray(i);
+            double v = pair.getDouble(0);
+            long ts = pair.getLong(1);
+            list.add(new EcgData((float) v, ts));
+        }
+        return list;
+    }
+
 }

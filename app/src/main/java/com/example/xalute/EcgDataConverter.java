@@ -8,6 +8,102 @@ import org.json.JSONObject;
 
 import java.util.List;
 
+
+public class EcgDataConverter {
+    public static String convertEcgDataListToServerBodyJson(
+            Context context,
+            List<EcgData> ecgDataList,
+            String currentTime,
+            double fallbackSamplingRateHz
+    ) {
+        try {
+            JSONObject root = new JSONObject();
+
+            JSONArray entry = new JSONArray();
+            root.put("entry", entry);
+
+            JSONObject entry0 = new JSONObject();
+            entry.put(entry0);
+
+            JSONObject resource = new JSONObject();
+            entry0.put("resource", resource);
+
+            SharedPreferences sharedPreferences = context.getSharedPreferences("MyPrefs", Context.MODE_PRIVATE);
+            String name = sharedPreferences.getString("name", "");
+            String birthDate = sharedPreferences.getString("birthDate", "");
+            String subjectRef = "Patient/" + name + ":" + birthDate + " " + currentTime;
+
+            JSONObject subject = new JSONObject();
+            subject.put("reference", subjectRef);
+            resource.put("subject", subject);
+
+            JSONArray component = new JSONArray();
+            resource.put("component", component);
+
+            JSONObject comp0 = new JSONObject();
+            component.put(comp0);
+
+            JSONObject vsd = new JSONObject();
+            comp0.put("valueSampledData", vsd);
+
+            JSONObject origin = new JSONObject();
+            origin.put("value", 55);
+            vsd.put("origin", origin);
+
+            vsd.put("dimension", 2);
+
+            long periodMs = estimatePeriodMillis(ecgDataList, fallbackSamplingRateHz);
+            vsd.put("period", periodMs);
+
+            JSONArray dataArr = new JSONArray();
+            for (EcgData d : ecgDataList) {
+                JSONArray pair = new JSONArray();
+                pair.put((double) d.getEcgValue());
+                pair.put(d.getTimestamp());
+                dataArr.put(pair);
+            }
+            vsd.put("data", dataArr);
+
+            String finalJson = root.toString();
+
+            int maxLength = 3000;
+            for (int i = 0; i < finalJson.length(); i += maxLength) {
+                int end = Math.min(finalJson.length(), i + maxLength);
+                android.util.Log.d("ECG_ADD_ECGDATA_JSON", finalJson.substring(i, end));
+            }
+
+            return finalJson;
+
+        } catch (JSONException e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    private static long estimatePeriodMillis(List<EcgData> list, double fallbackFsHz) {
+        try {
+            if (list == null || list.size() < 3) {
+                return Math.max(1L, Math.round(1000.0 / fallbackFsHz));
+            }
+
+            int n = Math.min(list.size() - 1, 2000);
+            long[] diffs = new long[n];
+            for (int i = 0; i < n; i++) {
+                diffs[i] = list.get(i + 1).getTimestamp() - list.get(i).getTimestamp();
+            }
+            java.util.Arrays.sort(diffs);
+            long median = diffs[n / 2];
+
+            if (median <= 0 || median > 1000) {
+                return Math.max(1L, Math.round(1000.0 / fallbackFsHz));
+            }
+            return median;
+        } catch (Exception e) {
+            return Math.max(1L, Math.round(1000.0 / fallbackFsHz));
+        }
+    }
+}
+/**
 public class EcgDataConverter {
 
     public static String convertEcgDataListToJsonString(Context context, List<EcgData> ecgDataList, String currentTime) {
@@ -88,4 +184,4 @@ public class EcgDataConverter {
         }
         return null;
     }
-}
+}**/
