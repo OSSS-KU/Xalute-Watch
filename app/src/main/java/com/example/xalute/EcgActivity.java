@@ -134,7 +134,7 @@ public class EcgActivity extends FragmentActivity {
                     return;
                 }
 
-                final String server1Url = "http://35.238.174.154:3000/mutation/addEcgData";
+                final String server1Url = "http://35.238.174.154:3010/mutation/addEcgData";
 
                 final String currentTime = getCurrentTime();
 
@@ -511,7 +511,7 @@ public class EcgActivity extends FragmentActivity {
     }
 
     private String getCurrentTime() {
-        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm");
+        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
         return sdf.format(new Date());
     }
 
