@@ -616,16 +616,15 @@ public class EcgActivity extends FragmentActivity {
             for (int i = 0; i < dataToSave.size(); i++) {
                 EcgData d = dataToSave.get(i);
 
-                // 1. 기존 FHIR 예시와 똑같이 (값, 시간) 형태로 작성
+                // 1. 내용은 '바뀐 대로': 실제 타임스탬프와 원본 ECG 값 사용
                 sb.append("(")
-                        .append((int)d.getEcgValue()).append(", ") // 정수형 변환 확인
+                        .append(d.getEcgValue()).append(", ")
                         .append(d.getTimestamp())
                         .append(")");
 
-                // 2. 데이터 쌍 사이에 반드시 '쉼표와 공백' 추가
-                if (i < dataToSave.size() - 1) {
-                    sb.append(", ");
-                }
+                // 2. 형식은 '기존 대로': 데이터 쌍 사이에 쉼표 없이 '공백'만 추가
+                // 이렇게 해야 서버가 쉼표를 기준으로 숫자를 2배로 세는 오류를 막습니다.
+                sb.append(" ");
             }
 
             writer.write(sb.toString());
