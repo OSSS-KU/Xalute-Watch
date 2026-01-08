@@ -109,9 +109,10 @@ public class EcgActivity extends FragmentActivity {
 
 
         SharedPreferences prefs = getSharedPreferences("MyPrefs", MODE_PRIVATE);
+        String token = prefs.getString("token", "");
         String name = prefs.getString("name", "");
         String birthDate = prefs.getString("birthDate", "");
-        Log.d("확인용", "EcgActivity에서 읽은 이름: " + name + ", 생일: " + birthDate);
+        Log.d("확인용", "EcgActivity에서 읽은 이름: " + name + ", 생일: " + birthDate + ", token:" + token);
 
         ecgContactState = ECG_NOT_CONTACTED;
 
@@ -159,7 +160,7 @@ public class EcgActivity extends FragmentActivity {
                     final String userAgent = "android";
 
                     EcgAddDataSender sender = new EcgAddDataSender();
-                    sender.postAddEcgData(server1Url, userAgent, requestBody, new EcgAddDataSender.Listener() {
+                    sender.postAddEcgData(token, server1Url, userAgent, requestBody, new EcgAddDataSender.Listener() {
                         @Override
                         public void onSuccess(String responseBody) {
                             runOnUiThread(() -> {
@@ -609,23 +610,26 @@ public class EcgActivity extends FragmentActivity {
 
             for (int i = 0; i < dataToSave.size(); i++) {
                 EcgData d = dataToSave.get(i);
+
+                // 1. 기존 FHIR 예시와 똑같이 (값, 시간) 형태로 작성
                 sb.append("(")
-                        .append(d.getEcgValue()).append(", ")
+                        .append((int)d.getEcgValue()).append(", ") // 정수형 변환 확인
                         .append(d.getTimestamp())
                         .append(")");
-                if (i < dataToSave.size() - 1) sb.append(" ");
+
+                // 2. 데이터 쌍 사이에 반드시 '쉼표와 공백' 추가
+                if (i < dataToSave.size() - 1) {
+                    sb.append(", ");
+                }
             }
 
             writer.write(sb.toString());
             writer.flush();
-            Log.d(TAG, "✅ ECG data saved to " + file.getAbsolutePath());
             return file;
         } catch (IOException e) {
-            Log.e(TAG, "❌ 파일 저장 중 오류", e);
             return null;
         }
     }
-
 
     private File saveRawEcgDataToFile() {
         File dir = new File(getExternalFilesDir(null), "ecg_raw_data_cut6");

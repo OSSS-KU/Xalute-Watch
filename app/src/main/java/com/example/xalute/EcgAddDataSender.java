@@ -22,6 +22,7 @@ public class EcgAddDataSender {
     private final OkHttpClient client = new OkHttpClient();
 
     public void postAddEcgData(
+            String token,
             String url,
             String userAgent,
             String jsonBody,
@@ -30,12 +31,12 @@ public class EcgAddDataSender {
         try {
             MediaType JSON = MediaType.parse("application/json; charset=utf-8");
             RequestBody body = RequestBody.create(jsonBody, JSON);
-
-            Request request = new Request.Builder()
+                    Request request = new Request.Builder()
                     .url(url)
                     .post(body)
                     .addHeader("Content-Type", "application/json")
                     .addHeader("User-Agent", userAgent)
+                    .addHeader("authorization", String.format("Bearer %s", token))
                     .build();
 
             client.newCall(request).enqueue(new Callback() {

@@ -44,9 +44,10 @@ public class MessageService extends Service implements MessageClient.OnMessageRe
                 String action = jsonObject.getString("action");
                 String name = jsonObject.getString("name");
                 String birthDate = jsonObject.getString("birthDate");
+                String token = jsonObject.getString("token");
 
                 // 저장 로직 추가
-                saveNameAndBirthDate(name, birthDate);
+                saveNameAndBirthDateAndToken(name, birthDate, token);
 
                 if ("launch_app".equals(action)) {
                     Log.d(TAG, "Launching the target app...");
@@ -66,6 +67,7 @@ public class MessageService extends Service implements MessageClient.OnMessageRe
                     intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                     intent.putExtra("name", name);
                     intent.putExtra("birthDate", birthDate);
+                    intent.putExtra("token", token);
                     startActivity(intent);
                     Log.d(TAG, "EcgActivity launched successfully");
                 } else {
@@ -79,11 +81,12 @@ public class MessageService extends Service implements MessageClient.OnMessageRe
         }
     }
 
-    private void saveNameAndBirthDate(String name, String birthDate) {
+    private void saveNameAndBirthDateAndToken(String name, String birthDate, String token) {
         SharedPreferences sharedPreferences = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
         SharedPreferences.Editor editor = sharedPreferences.edit();
         editor.putString("name", name);
         editor.putString("birthDate", birthDate);
+        editor.putString("token", token);
         editor.apply();
         Log.d(TAG, "Name and Birth Date saved to SharedPreferences");
     }
