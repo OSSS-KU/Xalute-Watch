@@ -206,7 +206,7 @@ public class EcgActivity extends FragmentActivity {
                             runOnUiThread(() -> {
                                 dismissProgressDialog();
                                 Log.e(TAG, "❌ 서버1 전송 실패: " + errorMsg);
-                                Toast.makeText(getApplicationContext(), "❌ 서버 전송 실패: " + errorMsg, Toast.LENGTH_LONG).show();
+                                Toast.makeText(getApplicationContext(), "❌ 서버 전송 실패: " + "모바일 앱으로 측정을 눌러서 다시 실행해주세요", Toast.LENGTH_LONG).show();
                             });
                         }
                     });
@@ -542,7 +542,7 @@ public class EcgActivity extends FragmentActivity {
             while ((line = reader.readLine()) != null) {
                 fileContent.append(line).append("\n");
             }
-            Log.d(TAG, "📤 전송할 ECG 파일 내용:\n" + fileContent.toString().trim());
+            Log.d(TAG, "📤 전송할 ECG 파일 내용:" + fileContent.toString().trim());
         } catch (IOException e) {
             Log.e(TAG, "❌ ECG 파일 내용 읽기 오류", e);
         }
