@@ -612,22 +612,25 @@ public class EcgActivity extends FragmentActivity {
 
         try (FileWriter writer = new FileWriter(file)) {
             StringBuilder sb = new StringBuilder();
+            int lth;
+            double intervalSec = 1.0 / 500.0;
 
-            for (int i = 0; i < dataToSave.size(); i++) {
+            if(dataToSave.size() >= 15100) {
+                lth = 15100;
+            }else{
+                lth = dataToSave.size();
+            }
+            for (int i = 0; i < lth; i++){
                 EcgData d = dataToSave.get(i);
 
                 // 1. 내용은 '바뀐 대로': 실제 타임스탬프와 원본 ECG 값 사용
                 sb.append("(")
                         .append(d.getEcgValue()).append(", ")
-                        .append(d.getTimestamp())
-                        .append(")");
-
-                // 2. 형식은 '기존 대로': 데이터 쌍 사이에 쉼표 없이 '공백'만 추가
-                // 이렇게 해야 서버가 쉼표를 기준으로 숫자를 2배로 세는 오류를 막습니다.
-                sb.append(" ");
+                        .append(i*intervalSec)
+                        .append(") ");
             }
 
-            writer.write(sb.toString());
+            writer.write(sb.toString().trim());
             writer.flush();
             return file;
         } catch (IOException e) {
