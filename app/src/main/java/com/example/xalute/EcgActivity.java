@@ -32,6 +32,9 @@ import androidx.fragment.app.FragmentActivity;
 
 import com.example.xalute.databinding.ActivityEcgBinding;
 import com.google.android.gms.wearable.Asset;
+import com.google.android.gms.wearable.MessageClient;
+import com.google.android.gms.wearable.MessageEvent;
+import com.google.android.gms.wearable.Node;
 import com.google.android.gms.wearable.PutDataMapRequest;
 import com.google.android.gms.wearable.PutDataRequest;
 import com.google.android.gms.wearable.Wearable;
@@ -74,7 +77,7 @@ import retrofit2.http.Multipart;
 import retrofit2.http.POST;
 import retrofit2.http.Part;
 
-public class EcgActivity extends FragmentActivity {
+public class EcgActivity extends FragmentActivity implements MessageClient.OnMessageReceivedListener {
 
     private final String TAG = EcgActivity.class.getSimpleName();
     private ActivityEcgBinding binding;
@@ -108,6 +111,12 @@ public class EcgActivity extends FragmentActivity {
 
     private long lastUiUpdateTime = 0;
 
+    private static final String GET_TOKEN_PATH = "/get-token";
+    private static final String TOKEN_RESPONSE_PATH = "/token-response";
+    private static final long TOKEN_TIMEOUT_MS = 5000;
+    private Runnable pendingSendAction = null;
+    private final Handler tokenTimeoutHandler = new Handler(Looper.getMainLooper());
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -126,91 +135,8 @@ public class EcgActivity extends FragmentActivity {
             setUp();
 
             binding.btnSend.setOnClickListener(view -> {
-                Log.d(TAG, "[Send] 버튼 클릭됨. ecgDataList 크기=" + ecgDataList.size());
-
-                File rawFile = saveRawEcgDataToFile();
-                if (rawFile != null) {
-                    Log.d(TAG, "✅ 원본 ECG 데이터가 저장되었습니다: " + rawFile.getAbsolutePath());
-                } else {
-                    Log.e(TAG, "❌ 원본 ECG 데이터 저장 실패");
-                }
-
-                if (ecgDataList.isEmpty()) {
-                    Toast.makeText(getApplicationContext(), "❗ ECG 데이터가 없습니다.", Toast.LENGTH_SHORT).show();
-                    return;
-                }
-
-                final String server1Url = "http://35.238.174.154:3010/mutation/addEcgData";
-
-                final String currentTime = getCurrentTime();
-
-                final String requestBody = EcgDataConverter.convertEcgDataListToServerBodyJson(
-                        getApplicationContext(),
-                        ecgDataList,
-                        currentTime,
-                        500.0
-                );
-
-                Log.d(TAG, "[Send] 서버1로 전송할 JSON: " + requestBody);
-
-                if (requestBody == null) {
-                    Toast.makeText(getApplicationContext(), "❌ 요청 바디 생성 실패", Toast.LENGTH_SHORT).show();
-                    return;
-                }
-
-                showProgressDialog();
-
-                new Handler(Looper.getMainLooper()).post(() -> {
-
-                    final String userAgent = "android";
-
-                    EcgAddDataSender sender = new EcgAddDataSender();
-                    sender.postAddEcgData(token, server1Url, userAgent, requestBody, new EcgAddDataSender.Listener() {
-                        @Override
-                        public void onSuccess(String responseBody) {
-                            runOnUiThread(() -> {
-                                try {
-                                    Log.d(TAG, "✅ 서버1 응답 수신: " + responseBody);
-
-                                    List<EcgData> returnedList = parseEcgListFromAddEcgResponse(responseBody);
-
-                                    if (returnedList == null || returnedList.isEmpty()) {
-                                        dismissProgressDialog();
-                                        Log.e(TAG, "❌ 서버 응답 data가 비어있음");
-                                        Toast.makeText(getApplicationContext(), "❌ 서버 응답 data가 비어있습니다.", Toast.LENGTH_LONG).show();
-                                        return;
-                                    }
-
-                                    File ecgFile = saveEcgDataToFile(returnedList);
-
-                                    if (ecgFile == null) {
-                                        dismissProgressDialog();
-                                        Log.e(TAG, "❌ ECG 파일 저장 실패");
-                                        Toast.makeText(getApplicationContext(), "❌ ECG 파일 저장 실패", Toast.LENGTH_SHORT).show();
-                                        return;
-                                    }
-
-                                    uploadEcgFileToServer(ecgFile);
-
-
-                                } catch (Exception e) {
-                                    dismissProgressDialog();
-                                    Log.e(TAG, "❌ 서버1 응답 처리 오류", e);
-                                    Toast.makeText(getApplicationContext(), "❌ 응답 처리 오류: " + e.getMessage(), Toast.LENGTH_LONG).show();
-                                }
-                            });
-                        }
-
-                        @Override
-                        public void onFailure(String errorMsg) {
-                            runOnUiThread(() -> {
-                                dismissProgressDialog();
-                                Log.e(TAG, "❌ 서버1 전송 실패: " + errorMsg);
-                                Toast.makeText(getApplicationContext(), "❌ 서버 전송 실패: " + errorMsg, Toast.LENGTH_LONG).show();
-                            });
-                        }
-                    });
-                });
+                Log.d(TAG, "[Send] 버튼 클릭됨. 토큰 갱신 요청 시작");
+                requestTokenFromPhone(this::performSend);
             });
 
 
@@ -220,6 +146,183 @@ public class EcgActivity extends FragmentActivity {
         }
     }
 
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        Wearable.getMessageClient(this).addListener(this);
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        Wearable.getMessageClient(this).removeListener(this);
+        tokenTimeoutHandler.removeCallbacksAndMessages(null);
+    }
+
+    @Override
+    public void onMessageReceived(MessageEvent messageEvent) {
+        Log.d(TAG, "onMessageReceived: " + messageEvent.getPath());
+
+        if (TOKEN_RESPONSE_PATH.equals(messageEvent.getPath())) {
+            String data = new String(messageEvent.getData());
+            Log.d(TAG, "토큰 응답 수신: " + data);
+
+            try {
+                String newToken;
+                try {
+                    JSONObject json = new JSONObject(data);
+                    newToken = json.getString("token");
+                } catch (Exception e) {
+                    newToken = data.trim();
+                }
+
+                SharedPreferences prefs = getSharedPreferences("MyPrefs", MODE_PRIVATE);
+                prefs.edit().putString("token", newToken).apply();
+                Log.d(TAG, "토큰 갱신 완료");
+            } catch (Exception e) {
+                Log.e(TAG, "토큰 파싱 오류", e);
+            }
+
+            tokenTimeoutHandler.removeCallbacksAndMessages(null);
+
+            if (pendingSendAction != null) {
+                Runnable action = pendingSendAction;
+                pendingSendAction = null;
+                new Handler(Looper.getMainLooper()).post(action);
+            }
+        }
+    }
+
+    private void requestTokenFromPhone(Runnable onComplete) {
+        pendingSendAction = onComplete;
+
+        Wearable.getNodeClient(this).getConnectedNodes().addOnSuccessListener(nodes -> {
+            if (nodes.isEmpty()) {
+                Log.w(TAG, "연결된 폰이 없음, 기존 토큰으로 진행");
+                pendingSendAction = null;
+                new Handler(Looper.getMainLooper()).post(onComplete);
+                return;
+            }
+
+            Node phoneNode = nodes.get(0);
+            Wearable.getMessageClient(this).sendMessage(phoneNode.getId(), GET_TOKEN_PATH, null)
+                    .addOnSuccessListener(i -> {
+                        Log.d(TAG, "/get-token 전송 성공, 응답 대기 중...");
+                        tokenTimeoutHandler.postDelayed(() -> {
+                            if (pendingSendAction != null) {
+                                Log.w(TAG, "토큰 응답 타임아웃, 기존 토큰으로 진행");
+                                pendingSendAction = null;
+                                onComplete.run();
+                            }
+                        }, TOKEN_TIMEOUT_MS);
+                    })
+                    .addOnFailureListener(e -> {
+                        Log.e(TAG, "/get-token 전송 실패, 기존 토큰으로 진행", e);
+                        pendingSendAction = null;
+                        new Handler(Looper.getMainLooper()).post(onComplete);
+                    });
+        }).addOnFailureListener(e -> {
+            Log.e(TAG, "노드 조회 실패, 기존 토큰으로 진행", e);
+            pendingSendAction = null;
+            new Handler(Looper.getMainLooper()).post(onComplete);
+        });
+    }
+
+    private void performSend() {
+        Log.d(TAG, "[performSend] 시작. ecgDataList 크기=" + ecgDataList.size());
+
+        SharedPreferences prefs = getSharedPreferences("MyPrefs", MODE_PRIVATE);
+        final String token = prefs.getString("token", "");
+
+        File rawFile = saveRawEcgDataToFile();
+        if (rawFile != null) {
+            Log.d(TAG, "✅ 원본 ECG 데이터가 저장되었습니다: " + rawFile.getAbsolutePath());
+        } else {
+            Log.e(TAG, "❌ 원본 ECG 데이터 저장 실패");
+        }
+
+        if (ecgDataList.isEmpty()) {
+            Toast.makeText(getApplicationContext(), "❗ ECG 데이터가 없습니다.", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        final String server1Url = "http://35.216.60.242:9101/mutation/addEcgData";
+
+        final String currentTime = getCurrentTime();
+
+        final String requestBody = EcgDataConverter.convertEcgDataListToServerBodyJson(
+                getApplicationContext(),
+                ecgDataList,
+                currentTime,
+                500.0
+        );
+
+        Log.d(TAG, "[performSend] 서버1로 전송할 JSON: " + requestBody);
+        Log.d(TAG, "[performSend] 사용 토큰: " + token);
+        Log.d(TAG, "[performSend] 전송 URL: " + server1Url);
+
+        if (requestBody == null) {
+            Toast.makeText(getApplicationContext(), "❌ 요청 바디 생성 실패", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        showProgressDialog();
+
+        new Handler(Looper.getMainLooper()).post(() -> {
+
+            final String userAgent = "android";
+
+            EcgAddDataSender sender = new EcgAddDataSender();
+            sender.postAddEcgData(token, server1Url, userAgent, requestBody, new EcgAddDataSender.Listener() {
+                @Override
+                public void onSuccess(String responseBody) {
+                    runOnUiThread(() -> {
+                        try {
+                            Log.d(TAG, "✅ 서버1 응답 수신: " + responseBody);
+
+                            List<EcgData> returnedList = parseEcgListFromAddEcgResponse(responseBody);
+
+                            if (returnedList == null || returnedList.isEmpty()) {
+                                dismissProgressDialog();
+                                Log.e(TAG, "❌ 서버 응답 data가 비어있음");
+                                Toast.makeText(getApplicationContext(), "❌ 서버 응답 data가 비어있습니다.", Toast.LENGTH_LONG).show();
+                                return;
+                            }
+
+                            File ecgFile = saveEcgDataToFile(returnedList);
+
+                            if (ecgFile == null) {
+                                dismissProgressDialog();
+                                Log.e(TAG, "❌ ECG 파일 저장 실패");
+                                Toast.makeText(getApplicationContext(), "❌ ECG 파일 저장 실패", Toast.LENGTH_SHORT).show();
+                                return;
+                            }
+
+                            uploadEcgFileToServer(ecgFile);
+
+                        } catch (Exception e) {
+                            dismissProgressDialog();
+                            Log.e(TAG, "❌ 서버1 응답 처리 오류", e);
+                            Toast.makeText(getApplicationContext(), "❌ 응답 처리 오류: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                        }
+                    });
+                }
+
+                @Override
+                public void onFailure(String errorMsg) {
+                    runOnUiThread(() -> {
+                        dismissProgressDialog();
+                        Log.e(TAG, "❌ 서버1 전송 실패");
+                        Log.e(TAG, "  URL: " + server1Url);
+                        Log.e(TAG, "  Token: " + token);
+                        Log.e(TAG, "  ErrorMsg: " + errorMsg);
+                        Toast.makeText(getApplicationContext(), "❌ 서버 전송 실패: " + errorMsg, Toast.LENGTH_LONG).show();
+                    });
+                }
+            });
+        });
+    }
 
     private void StartCountTimer() {
         if ( ecgTracker != null ) {
