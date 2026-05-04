@@ -46,9 +46,14 @@ import com.samsung.android.service.health.tracking.data.DataPoint;
 import com.samsung.android.service.health.tracking.data.HealthTrackerType;
 import com.samsung.android.service.health.tracking.data.ValueKey;
 
+import com.samsung.android.service.health.tracking.data.ValueKey.SpO2Set;
+import com.samsung.android.service.health.tracking.data.ValueKey.HeartRateSet;
+import com.samsung.android.service.health.tracking.data.ValueKey.SkinTemperatureSet;
+
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.json.JSONArray;
+import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.io.BufferedReader;
@@ -66,6 +71,7 @@ import java.util.List;
 
 import okhttp3.MediaType;
 import okhttp3.MultipartBody;
+import okhttp3.OkHttpClient;
 import okhttp3.RequestBody;
 import okhttp3.ResponseBody;
 import retrofit2.Call;
@@ -88,6 +94,13 @@ public class EcgActivity extends FragmentActivity implements MessageClient.OnMes
     private boolean isHandlerRunning;
     private final Handler handler = new Handler(Looper.myLooper());
     private HealthTracker ecgTracker = null;
+    private HealthTracker spo2Tracker = null;
+    private HealthTracker heartRateTracker = null;
+    private HealthTracker skinTempTracker = null;
+
+    private List<Integer> spo2DataList = new ArrayList<>();
+    private List<Integer> heartRateDataList = new ArrayList<>();
+    private List<Float> skinTempDataList = new ArrayList<>();
 
     private boolean isTimerRunning = false;
     private boolean isFirst;
@@ -400,6 +413,15 @@ public class EcgActivity extends FragmentActivity implements MessageClient.OnMes
         if (ecgTracker != null) {
             ecgTracker.unsetEventListener();
         }
+        if (spo2Tracker != null) {
+            spo2Tracker.unsetEventListener();
+        }
+        if (heartRateTracker != null) {
+            heartRateTracker.unsetEventListener();
+        }
+        if (skinTempTracker != null) {
+            skinTempTracker.unsetEventListener();
+        }
         handler.removeCallbacksAndMessages(null);
         isHandlerRunning = false;
 
@@ -422,6 +444,29 @@ public class EcgActivity extends FragmentActivity implements MessageClient.OnMes
                 if (ecgTracker != null) {
                     StartTrackerListner();
                 }
+
+                spo2Tracker = healthTrackingService.getHealthTracker(HealthTrackerType.SPO2);
+                if (spo2Tracker != null) {
+                    spo2Tracker.setEventListener(spo2EventListener);
+                    Log.i(TAG, "SpO2 tracker started");
+                }
+
+                heartRateTracker = healthTrackingService.getHealthTracker(HealthTrackerType.HEART_RATE_CONTINUOUS);
+                if (heartRateTracker != null) {
+                    heartRateTracker.setEventListener(heartRateEventListener);
+                    Log.i(TAG, "HeartRate tracker started");
+                }
+
+                try {
+                    skinTempTracker = healthTrackingService.getHealthTracker(HealthTrackerType.SKIN_TEMPERATURE);
+                    if (skinTempTracker != null) {
+                        skinTempTracker.setEventListener(skinTempEventListener);
+                        Log.i(TAG, "SkinTemperature tracker started");
+                    }
+                } catch (UnsupportedOperationException e) {
+                    Log.w(TAG, "SkinTemperature not supported on this device, skipping.");
+                }
+
             } catch (final IllegalArgumentException e) {
                 runOnUiThread(() -> Toast.makeText(getApplicationContext(), e.getMessage(), Toast.LENGTH_LONG).show());
                 finish();
@@ -565,6 +610,57 @@ public class EcgActivity extends FragmentActivity implements MessageClient.OnMes
         }
     };
 
+    private final HealthTracker.TrackerEventListener spo2EventListener = new HealthTracker.TrackerEventListener() {
+        @Override
+        public void onDataReceived(@NonNull List<DataPoint> list) {
+            for (DataPoint dp : list) {
+                int spo2 = dp.getValue(SpO2Set.SPO2);
+                int status = dp.getValue(SpO2Set.STATUS);
+                long ts = dp.getTimestamp();
+                spo2DataList.add(spo2);
+                Log.d(TAG, "SpO2: " + spo2 + "%, status=" + status + ", ts=" + ts);
+            }
+        }
+        @Override public void onFlushCompleted() {}
+        @Override public void onError(HealthTracker.TrackerError e) {
+            Log.e(TAG, "SpO2 tracker error: " + e);
+        }
+    };
+
+    private final HealthTracker.TrackerEventListener heartRateEventListener = new HealthTracker.TrackerEventListener() {
+        @Override
+        public void onDataReceived(@NonNull List<DataPoint> list) {
+            for (DataPoint dp : list) {
+                int hr = dp.getValue(HeartRateSet.HEART_RATE);
+                int status = dp.getValue(HeartRateSet.HEART_RATE_STATUS);
+                long ts = dp.getTimestamp();
+                heartRateDataList.add(hr);
+                Log.d(TAG, "HeartRate: " + hr + "bpm, status=" + status + ", ts=" + ts);
+            }
+        }
+        @Override public void onFlushCompleted() {}
+        @Override public void onError(HealthTracker.TrackerError e) {
+            Log.e(TAG, "HeartRate tracker error: " + e);
+        }
+    };
+
+    private final HealthTracker.TrackerEventListener skinTempEventListener = new HealthTracker.TrackerEventListener() {
+        @Override
+        public void onDataReceived(@NonNull List<DataPoint> list) {
+            for (DataPoint dp : list) {
+                float skinTemp = dp.getValue(SkinTemperatureSet.OBJECT_TEMPERATURE);
+                float ambientTemp = dp.getValue(SkinTemperatureSet.AMBIENT_TEMPERATURE);
+                long ts = dp.getTimestamp();
+                skinTempDataList.add(skinTemp);
+                Log.d(TAG, "SkinTemp: " + skinTemp + "°C, ambient=" + ambientTemp + "°C, ts=" + ts);
+            }
+        }
+        @Override public void onFlushCompleted() {}
+        @Override public void onError(HealthTracker.TrackerError e) {
+            Log.e(TAG, "SkinTemperature tracker error: " + e);
+        }
+    };
+
     public final void setUp() {
         Log.i(TAG, "setUp");
         binding = DataBindingUtil.setContentView(this, R.layout.activity_ecg);
@@ -603,6 +699,18 @@ public class EcgActivity extends FragmentActivity implements MessageClient.OnMes
         if (ecgTracker != null) {
             ecgTracker.unsetEventListener();
             ecgTracker = null;
+        }
+        if (spo2Tracker != null) {
+            spo2Tracker.unsetEventListener();
+            spo2Tracker = null;
+        }
+        if (heartRateTracker != null) {
+            heartRateTracker.unsetEventListener();
+            heartRateTracker = null;
+        }
+        if (skinTempTracker != null) {
+            skinTempTracker.unsetEventListener();
+            skinTempTracker = null;
         }
 
         if (timer != null) {
@@ -650,8 +758,15 @@ public class EcgActivity extends FragmentActivity implements MessageClient.OnMes
             Log.e(TAG, "❌ ECG 파일 내용 읽기 오류", e);
         }
 
+        OkHttpClient okHttpClient = new OkHttpClient.Builder()
+                .connectTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
+                .readTimeout(60, java.util.concurrent.TimeUnit.SECONDS)
+                .writeTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
+                .build();
+
         Retrofit retrofit = new Retrofit.Builder()
                 .baseUrl("http://34.69.44.173:7001")
+                .client(okHttpClient)
                 .addConverterFactory(GsonConverterFactory.create())
                 .build();
 
@@ -700,8 +815,8 @@ public class EcgActivity extends FragmentActivity implements MessageClient.OnMes
             @Override
             public void onFailure(Call<ResponseBody> call, Throwable t) {
                 dismissProgressDialog();
-                Log.e(TAG, "네트워크 오류 발생", t);
-                Toast.makeText(EcgActivity.this, "네트워크 오류 발생", Toast.LENGTH_LONG).show();
+                Log.e(TAG, "네트워크 오류 발생: " + t.getClass().getSimpleName() + " - " + t.getMessage(), t);
+                Toast.makeText(EcgActivity.this, "네트워크 오류: " + t.getClass().getSimpleName() + "\n" + t.getMessage(), Toast.LENGTH_LONG).show();
             }
 
         });
@@ -866,11 +981,29 @@ public class EcgActivity extends FragmentActivity implements MessageClient.OnMes
 
         long epochMillis = System.currentTimeMillis();
 
+        // vitals raw data → JSON string
+        JSONArray spo2Json = new JSONArray();
+        for (int v : spo2DataList) spo2Json.put(v);
+
+        JSONArray hrJson = new JSONArray();
+        for (int v : heartRateDataList) hrJson.put(v);
+
+        JSONArray tempJson = new JSONArray();
+        try {
+            for (float v : skinTempDataList) tempJson.put(v);
+        } catch (JSONException e) {
+            Log.e(TAG, "skinTemp JSON 변환 오류", e);
+        }
+
         PutDataMapRequest putDataMapRequest = PutDataMapRequest.create("/ecg_file");
         putDataMapRequest.getDataMap().putAsset("ecg_data", asset);
         putDataMapRequest.getDataMap().putLong("timestamp", epochMillis);
         putDataMapRequest.getDataMap().putString("result", result);
         putDataMapRequest.getDataMap().putString("result_json", resultJson);
+        putDataMapRequest.getDataMap().putString("spo2_data", spo2Json.toString());
+        putDataMapRequest.getDataMap().putString("heart_rate_data", hrJson.toString());
+        putDataMapRequest.getDataMap().putString("skin_temp_data", tempJson.toString());
+        Log.d(TAG, "📤 Vitals 전송 - SpO2: " + spo2DataList.size() + "건, HR: " + heartRateDataList.size() + "건, SkinTemp: " + skinTempDataList.size() + "건");
 
         PutDataRequest putDataRequest = putDataMapRequest.asPutDataRequest();
 
