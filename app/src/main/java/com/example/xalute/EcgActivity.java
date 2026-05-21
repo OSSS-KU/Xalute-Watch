@@ -821,7 +821,7 @@ public class EcgActivity extends FragmentActivity implements MessageClient.OnMes
                 .build();
 
         Retrofit retrofit = new Retrofit.Builder()
-                .baseUrl("http://34.69.44.173:7001")
+                .baseUrl("http://34.69.44.173:9010")
                 .client(okHttpClient)
                 .addConverterFactory(GsonConverterFactory.create())
                 .build();
