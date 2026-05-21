@@ -290,26 +290,21 @@ public class EcgActivity extends FragmentActivity implements MessageClient.OnMes
                 @Override
                 public void onSuccess(String responseBody) {
                     runOnUiThread(() -> {
-                        try {
-                            Log.d(TAG, "✅ 서버1 응답 수신: " + responseBody);
+                        Log.d(TAG, "✅ 서버1 응답 수신: " + responseBody);
 
-                            List<EcgData> returnedList = parseEcgListFromAddEcgResponse(responseBody);
-                            if (returnedList != null && !returnedList.isEmpty()) {
-                                File ecgFile = saveEcgDataToFile(returnedList);
-                                if (ecgFile != null) {
-                                    sendFileToPhone(ecgFile, "", responseBody);
-                                }
-                            }
-                        } catch (Exception e) {
-                            Log.e(TAG, "❌ 서버1 응답 처리 오류", e);
-                        } finally {
-                            dismissProgressDialog();
-                            Toast.makeText(getApplicationContext(), "✅ 전송 완료", Toast.LENGTH_SHORT).show();
-                            Intent intent = new Intent(EcgActivity.this, EcgInfoActivity.class);
-                            intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
-                            startActivity(intent);
-                            finish();
+                        File ecgFile = saveEcgDataToFile(ecgDataList);
+                        if (ecgFile != null) {
+                            sendFileToPhone(ecgFile, "", responseBody);
+                        } else {
+                            Log.e(TAG, "❌ ECG 파일 저장 실패");
                         }
+
+                        dismissProgressDialog();
+                        Toast.makeText(getApplicationContext(), "✅ 전송 완료", Toast.LENGTH_SHORT).show();
+                        Intent intent = new Intent(EcgActivity.this, EcgInfoActivity.class);
+                        intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+                        startActivity(intent);
+                        finish();
                     });
                 }
 
