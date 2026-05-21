@@ -588,7 +588,9 @@ public class EcgActivity extends FragmentActivity implements MessageClient.OnMes
         @Override
         public void onDataReceived(@NonNull List<DataPoint> list) {
             for (DataPoint dp : list) {
-                spo2DataList.add(dp.getValue(SpO2Set.SPO2));
+                if (dp.getValue(SpO2Set.STATUS) == 2) {
+                    spo2DataList.add(dp.getValue(SpO2Set.SPO2));
+                }
             }
         }
         @Override public void onFlushCompleted() {}
