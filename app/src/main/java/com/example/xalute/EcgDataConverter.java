@@ -65,13 +65,7 @@ public class EcgDataConverter {
             vsd.put("data", dataArr);
 
             String finalJson = root.toString();
-
-            int maxLength = 3000;
-            for (int i = 0; i < finalJson.length(); i += maxLength) {
-                int end = Math.min(finalJson.length(), i + maxLength);
-                android.util.Log.d("ECG_ADD_ECGDATA_JSON", finalJson.substring(i, end));
-            }
-
+            android.util.Log.d("ECG_ADD_ECGDATA_JSON", "JSON length: " + finalJson.length() + " bytes, dataPoints: " + ecgDataList.size());
             return finalJson;
 
         } catch (JSONException e) {

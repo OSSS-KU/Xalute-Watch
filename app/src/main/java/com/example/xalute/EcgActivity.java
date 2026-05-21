@@ -271,8 +271,6 @@ public class EcgActivity extends FragmentActivity implements MessageClient.OnMes
                 500.0
         );
 
-        Log.d(TAG, "[performSend] 서버1로 전송할 JSON: " + requestBody);
-        Log.d(TAG, "[performSend] 사용 토큰: " + token);
         Log.d(TAG, "[performSend] 전송 URL: " + server1Url);
 
         if (requestBody == null) {
@@ -281,6 +279,7 @@ public class EcgActivity extends FragmentActivity implements MessageClient.OnMes
         }
 
         showProgressDialog();
+        sendVitalSigns(token, currentTime);
 
         new Handler(Looper.getMainLooper()).post(() -> {
 
@@ -343,8 +342,7 @@ public class EcgActivity extends FragmentActivity implements MessageClient.OnMes
             timer = new CountDownTimer(30000, 1000) {
                 @Override
                 public void onTick(long millisUntilFinished) {
-                    Log.i(TAG, " StartCountTimer: onTick called - "+ millisUntilFinished/1000);
-                    if ( ecgContactState == ECG_CONTACTED )
+                        if ( ecgContactState == ECG_CONTACTED )
                         binding.ecgSecond.setText("남은 시간: " + millisUntilFinished/1000);
                     else {
                         binding.ecgSecond.setText(String.valueOf(30));
@@ -494,7 +492,6 @@ public class EcgActivity extends FragmentActivity implements MessageClient.OnMes
     public void addEcgData(float ecgValue, long timestamp) {
         EcgData newEcgData = new EcgData(ecgValue, timestamp);
         ecgDataList.add(newEcgData);
-        Log.d(TAG, "✅ 저장된 ECG 데이터 개수: " + ecgDataList.size());
     }
 
     private final HealthTracker.TrackerEventListener trackerEventListener = new HealthTracker.TrackerEventListener() {
@@ -502,15 +499,8 @@ public class EcgActivity extends FragmentActivity implements MessageClient.OnMes
         public void onDataReceived(@NonNull List<DataPoint> list) {
             int lth = list.size();
             total += lth;
-            String l = String.valueOf(total);
-            Log.i(TAG, "✅ Total Count : " + l);
 
             if (!list.isEmpty()) {
-                Log.i(TAG, "✅ List Size : " + list.size());
-
-                Log.i(TAG, "Batch size: " + list.size() +
-                        ", First TS: " + list.get(0).getTimestamp() +
-                        ", Last TS: " + list.get(list.size()-1).getTimestamp());
 
 
                 for (int i = 0; i < list.size(); i++) {
@@ -564,7 +554,6 @@ public class EcgActivity extends FragmentActivity implements MessageClient.OnMes
                                     finish();
                                 }
                             } else {
-                                Log.w(TAG, "⚠️ LeadOff 감지됨, 무시하고 측정 유지 중 (" + leadOffCount + "/" + leadOffThreshold + ")");
                                 binding.leadOffDataValue.setTextColor(ContextCompat.getColor(getApplicationContext(), R.color.gray));
                             }
                         }
@@ -584,8 +573,6 @@ public class EcgActivity extends FragmentActivity implements MessageClient.OnMes
                         binding.thresholdMinDataValue.setText(String.valueOf(list.get(0).getValue(ValueKey.EcgSet.MIN_THRESHOLD_MV)));
                     });
                 }
-            } else {
-                Log.i(TAG, "⚠️ onDataReceived List is zero");
             }
         }
 
@@ -614,11 +601,7 @@ public class EcgActivity extends FragmentActivity implements MessageClient.OnMes
         @Override
         public void onDataReceived(@NonNull List<DataPoint> list) {
             for (DataPoint dp : list) {
-                int spo2 = dp.getValue(SpO2Set.SPO2);
-                int status = dp.getValue(SpO2Set.STATUS);
-                long ts = dp.getTimestamp();
-                spo2DataList.add(spo2);
-                Log.d(TAG, "SpO2: " + spo2 + "%, status=" + status + ", ts=" + ts);
+                spo2DataList.add(dp.getValue(SpO2Set.SPO2));
             }
         }
         @Override public void onFlushCompleted() {}
@@ -631,11 +614,7 @@ public class EcgActivity extends FragmentActivity implements MessageClient.OnMes
         @Override
         public void onDataReceived(@NonNull List<DataPoint> list) {
             for (DataPoint dp : list) {
-                int hr = dp.getValue(HeartRateSet.HEART_RATE);
-                int status = dp.getValue(HeartRateSet.HEART_RATE_STATUS);
-                long ts = dp.getTimestamp();
-                heartRateDataList.add(hr);
-                Log.d(TAG, "HeartRate: " + hr + "bpm, status=" + status + ", ts=" + ts);
+                heartRateDataList.add(dp.getValue(HeartRateSet.HEART_RATE));
             }
         }
         @Override public void onFlushCompleted() {}
@@ -648,11 +627,7 @@ public class EcgActivity extends FragmentActivity implements MessageClient.OnMes
         @Override
         public void onDataReceived(@NonNull List<DataPoint> list) {
             for (DataPoint dp : list) {
-                float skinTemp = dp.getValue(SkinTemperatureSet.OBJECT_TEMPERATURE);
-                float ambientTemp = dp.getValue(SkinTemperatureSet.AMBIENT_TEMPERATURE);
-                long ts = dp.getTimestamp();
-                skinTempDataList.add(skinTemp);
-                Log.d(TAG, "SkinTemp: " + skinTemp + "°C, ambient=" + ambientTemp + "°C, ts=" + ts);
+                skinTempDataList.add(dp.getValue(SkinTemperatureSet.OBJECT_TEMPERATURE));
             }
         }
         @Override public void onFlushCompleted() {}
@@ -724,6 +699,87 @@ public class EcgActivity extends FragmentActivity implements MessageClient.OnMes
         if (healthTrackingService != null) {
             healthTrackingService.disconnectService();
             healthTrackingService = null;
+        }
+    }
+
+    private void sendVitalSigns(String token, String currentTime) {
+        if (spo2DataList.isEmpty() && heartRateDataList.isEmpty() && skinTempDataList.isEmpty()) return;
+
+        String body = buildVitalSignsJson(currentTime);
+        if (body == null) return;
+
+        final String url = "http://35.216.60.242:9101/mutation/addVitalSigns";
+        EcgAddDataSender sender = new EcgAddDataSender();
+        sender.postAddEcgData(token, url, "android", body, new EcgAddDataSender.Listener() {
+            @Override
+            public void onSuccess(String responseBody) {
+                Log.d(TAG, "✅ Vital Signs 전송 성공");
+            }
+            @Override
+            public void onFailure(String errorMsg) {
+                Log.e(TAG, "❌ Vital Signs 전송 실패: " + errorMsg);
+            }
+        });
+    }
+
+    private String buildVitalSignsJson(String currentTime) {
+        try {
+            SharedPreferences prefs = getSharedPreferences("MyPrefs", MODE_PRIVATE);
+            String name = prefs.getString("name", "");
+            String birthDate = prefs.getString("birthDate", "");
+
+            JSONObject root = new JSONObject();
+            JSONArray entry = new JSONArray();
+            root.put("entry", entry);
+
+            JSONObject entryItem = new JSONObject();
+            entry.put(entryItem);
+
+            JSONObject resource = new JSONObject();
+            entryItem.put("resource", resource);
+
+            JSONObject subject = new JSONObject();
+            subject.put("reference", "Patient/" + name + ":" + birthDate);
+            resource.put("subject", subject);
+            resource.put("effectiveDateTime", currentTime);
+
+            JSONArray component = new JSONArray();
+            resource.put("component", component);
+
+            if (!spo2DataList.isEmpty()) {
+                JSONArray vals = new JSONArray();
+                for (int v : spo2DataList) vals.put(v);
+                JSONObject comp = new JSONObject();
+                comp.put("code", "SpO2");
+                comp.put("unit", "%");
+                comp.put("values", vals);
+                component.put(comp);
+            }
+
+            if (!heartRateDataList.isEmpty()) {
+                JSONArray vals = new JSONArray();
+                for (int v : heartRateDataList) vals.put(v);
+                JSONObject comp = new JSONObject();
+                comp.put("code", "HeartRate");
+                comp.put("unit", "bpm");
+                comp.put("values", vals);
+                component.put(comp);
+            }
+
+            if (!skinTempDataList.isEmpty()) {
+                JSONArray vals = new JSONArray();
+                for (float v : skinTempDataList) vals.put(v);
+                JSONObject comp = new JSONObject();
+                comp.put("code", "SkinTemperature");
+                comp.put("unit", "°C");
+                comp.put("values", vals);
+                component.put(comp);
+            }
+
+            return root.toString();
+        } catch (JSONException e) {
+            Log.e(TAG, "❌ Vital Signs JSON 생성 오류", e);
+            return null;
         }
     }
 
