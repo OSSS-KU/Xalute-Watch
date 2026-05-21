@@ -1005,17 +1005,6 @@ public class EcgActivity extends FragmentActivity implements MessageClient.OnMes
             return;
         }
 
-        try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
-            StringBuilder fileContent = new StringBuilder();
-            String line;
-            while ((line = reader.readLine()) != null) {
-                fileContent.append(line).append("\n");
-            }
-            Log.d(TAG, "📤 워치에서 전송할 ECG 파일 내용:\n" + fileContent.toString().trim());
-        } catch (IOException e) {
-            Log.e(TAG, "❌ 파일 읽기 오류", e);
-        }
-
         Asset asset = createAssetFromFile(file);
         if (asset == null) {
             Log.e(TAG, "Asset 변환 실패");
@@ -1024,29 +1013,11 @@ public class EcgActivity extends FragmentActivity implements MessageClient.OnMes
 
         long epochMillis = System.currentTimeMillis();
 
-        // vitals raw data → JSON string
-        JSONArray spo2Json = new JSONArray();
-        for (int v : spo2DataList) spo2Json.put(v);
-
-        JSONArray hrJson = new JSONArray();
-        for (int v : heartRateDataList) hrJson.put(v);
-
-        JSONArray tempJson = new JSONArray();
-        try {
-            for (float v : skinTempDataList) tempJson.put(v);
-        } catch (JSONException e) {
-            Log.e(TAG, "skinTemp JSON 변환 오류", e);
-        }
-
         PutDataMapRequest putDataMapRequest = PutDataMapRequest.create("/ecg_file");
         putDataMapRequest.getDataMap().putAsset("ecg_data", asset);
         putDataMapRequest.getDataMap().putLong("timestamp", epochMillis);
         putDataMapRequest.getDataMap().putString("result", result);
         putDataMapRequest.getDataMap().putString("result_json", resultJson);
-        putDataMapRequest.getDataMap().putString("spo2_data", spo2Json.toString());
-        putDataMapRequest.getDataMap().putString("heart_rate_data", hrJson.toString());
-        putDataMapRequest.getDataMap().putString("skin_temp_data", tempJson.toString());
-        Log.d(TAG, "📤 Vitals 전송 - SpO2: " + spo2DataList.size() + "건, HR: " + heartRateDataList.size() + "건, SkinTemp: " + skinTempDataList.size() + "건");
 
         PutDataRequest putDataRequest = putDataMapRequest.asPutDataRequest();
 
